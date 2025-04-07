@@ -1,1 +1,1209 @@
-<h1>vibecar!</h1>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VibeCar Live Tune Sim</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #2d2d2d;
+            color: #eee;
+            font-size: 24px;
+        }
+        canvas { display: block; }
+        .panel {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            line-height: 1.6;
+            z-index: 10;
+            max-height: 90vh;
+            overflow-y: auto;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        #info {
+            top: 20px;
+            left: 20px;
+            width: 440px;
+        }
+         #info h4 {
+            margin-top: 0;
+            margin-bottom: 16px;
+            color: #ffa500;
+            border-bottom: 2px solid #555;
+            padding-bottom: 8px;
+            font-size: 1.2em;
+         }
+         #info p {
+             margin-top: 0;
+             margin-bottom: 20px;
+             font-size: 0.9em;
+             color: #ccc;
+         }
+         #info span {
+             font-size: 1.0em;
+             display: block;
+             margin-bottom: 5px;
+         }
+        #tuning-panel {
+            bottom: 20px;
+            left: 20px;
+            width: 560px;
+        }
+         #tuning-panel h4 {
+            margin-top: 0;
+            margin-bottom: 16px;
+            color: #ffa500;
+            border-bottom: 2px solid #555;
+            padding-bottom: 8px;
+            font-size: 1.2em;
+         }
+        .control-group {
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .control-group label {
+             display: inline-block;
+             width: 240px;
+             margin-right: 10px;
+             font-size: 0.9em;
+             color: #ccc;
+             flex-shrink: 0;
+        }
+         .control-group input[type="range"] {
+             flex-grow: 1;
+             height: 16px;
+             cursor: pointer;
+             margin-right: 10px;
+             vertical-align: middle;
+             min-width: 150px;
+         }
+         .value-display {
+             font-weight: bold;
+             color: #4CAF50;
+             min-width: 70px;
+             text-align: right;
+             font-size: 0.9em;
+             vertical-align: middle;
+             flex-shrink: 0;
+         }
+        #debug {
+            top: 20px;
+            right: 20px;
+            background: rgba(20,0,0,0.75);
+            color: #ffaaaa;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 18px;
+            max-height: 50vh;
+            overflow-y: auto;
+            width: 400px;
+            line-height: 1.4;
+            z-index: 10;
+         }
+         hr {
+             border: none;
+             border-top: 2px solid #555;
+             margin: 16px 0;
+         }
+    </style>
+</head>
+<body>
+    <div id="info" class="panel">
+        <h4>VibeCar Live Tune Sim</h4>
+        <p>
+            A simple raycast-based vehicle physics simulation (VibeCar) using Three.js/Cannon.js. Tune parameters live. Automatically attempts to flip if stuck. Added ramps! Hit the trees! Press 'F' to flip manually.
+        </p>
+        <hr>
+        Controls:<br>
+        W - Accelerate<br>
+        S - Brake/Reverse<br>
+        A/D - Turn Left/Right<br>
+        R - Reset Car Position<br>
+        Space - Handbrake<br>
+        F - Flip Car Over<br>
+        Mouse Drag - Orbit Camera<br>
+        Mouse Wheel - Zoom Camera<br>
+        <hr>
+        Vibecoded by Trent Sterling<br>
+        April 4th, 2025
+        <hr>
+        <span id="speed">Speed: 0 km/h</span><br>
+        <span id="slip_fl">FL Slip Vel: 0.00</span><br>
+        <span id="slip_fr">FR Slip Vel: 0.00</span><br>
+        <span id="slip_rl">RL Slip Vel: 0.00</span><br>
+        <span id="slip_rr">RR Slip Vel: 0.00</span>
+    </div>
+
+    <div id="tuning-panel" class="panel">
+        <h4>Live Tuning</h4>
+         <div class="control-group">
+             <label for="carMass">Car Mass (kg):</label>
+             <input type="range" id="carMass" min="500" max="2500" step="50">
+             <span class="value-display" id="carMassValue"></span>
+         </div>
+        <div class="control-group">
+            <label for="engineForce">Engine Force:</label>
+            <input type="range" id="engineForce" min="0" max="30000" step="500">
+            <span class="value-display" id="engineForceValue"></span>
+        </div>
+        <div class="control-group">
+            <label for="springStrength">Susp Strength:</label>
+            <input type="range" id="springStrength" min="1000" max="150000" step="1000">
+            <span class="value-display" id="springStrengthValue"></span>
+        </div>
+        <div class="control-group">
+            <label for="springDamper">Susp Damping:</label>
+            <input type="range" id="springDamper" min="0" max="100" step="5">
+            <span class="value-display" id="springDamperValue"></span>
+        </div>
+         <div class="control-group">
+             <label for="suspensionRestDist">Susp Rest Length:</label>
+             <input type="range" id="suspensionRestDist" min="0.1" max="2.0" step="0.01">
+             <span class="value-display" id="suspensionRestDistValue"></span>
+         </div>
+        <div class="control-group">
+             <label for="suspensionMaxTravel">Susp Max Travel:</label>
+             <input type="range" id="suspensionMaxTravel" min="0.01" max="1.5" step="0.01">
+             <span class="value-display" id="suspensionMaxTravelValue"></span>
+        </div>
+         <div class="control-group">
+             <label for="maxWheelDrop">Max Wheel Drop:</label>
+             <input type="range" id="maxWheelDrop" min="0.0" max="2.0" step="0.01">
+             <span class="value-display" id="maxWheelDropValue"></span>
+        </div>
+         <div class="control-group">
+            <label for="suspMountPointYOffset">Susp Mount Y Offset:</label>
+            <input type="range" id="suspMountPointYOffset" min="-1.0" max="1.0" step="0.05">
+            <span class="value-display" id="suspMountPointYOffsetValue"></span>
+        </div>
+         <div class="control-group">
+            <label for="wheelRadius">Wheel Radius:</label>
+            <input type="range" id="wheelRadius" min="0.1" max="1.2" step="0.01">
+            <span class="value-display" id="wheelRadiusValue"></span>
+        </div>
+         <div class="control-group">
+             <label for="frontTrackWidth">Front Track Width:</label>
+             <input type="range" id="frontTrackWidth" min="0.5" max="3.0" step="0.05">
+             <span class="value-display" id="frontTrackWidthValue"></span>
+         </div>
+         <div class="control-group">
+             <label for="rearTrackWidth">Rear Track Width:</label>
+             <input type="range" id="rearTrackWidth" min="0.5" max="3.0" step="0.05">
+             <span class="value-display" id="rearTrackWidthValue"></span>
+         </div>
+         <div class="control-group">
+            <label for="brakeForceMult">Brake Force Mult:</label>
+            <input type="range" id="brakeForceMult" min="0" max="500" step="10">
+            <span class="value-display" id="brakeForceMultValue"></span>
+        </div>
+        <div class="control-group">
+            <label for="handbrakeForceMult">Handbrake Mult:</label>
+            <input type="range" id="handbrakeForceMult" min="0" max="200" step="5">
+            <span class="value-display" id="handbrakeForceMultValue"></span>
+        </div>
+        <div class="control-group">
+            <label for="maxGripFactor">Max Grip Factor:</label>
+            <input type="range" id="maxGripFactor" min="0.0" max="2.5" step="0.05">
+            <span class="value-display" id="maxGripFactorValue"></span>
+        </div>
+        <div class="control-group">
+            <label for="minGripFactor">Min Grip Factor:</label>
+            <input type="range" id="minGripFactor" min="0.0" max="1.0" step="0.05">
+            <span class="value-display" id="minGripFactorValue"></span>
+        </div>
+         <div class="control-group">
+            <label for="gripFalloffSpeed">Grip Falloff Spd:</label>
+            <input type="range" id="gripFalloffSpeed" min="0.1" max="15.0" step="0.1">
+            <span class="value-display" id="gripFalloffSpeedValue"></span>
+        </div>
+        <div class="control-group">
+            <label for="maxSteerAngleDeg">Max Steer (Deg):</label>
+            <input type="range" id="maxSteerAngleDeg" min="5" max="45" step="1">
+            <span class="value-display" id="maxSteerAngleDegValue"></span>
+        </div>
+         <div class="control-group">
+            <label for="steerSpeed">Steer Speed:</label>
+            <input type="range" id="steerSpeed" min="0.1" max="8.0" step="0.1">
+            <span class="value-display" id="steerSpeedValue"></span>
+        </div>
+         <div class="control-group">
+            <label for="linearDamping">Linear Damp:</label>
+            <input type="range" id="linearDamping" min="0.0" max="0.99" step="0.01">
+            <span class="value-display" id="linearDampingValue"></span>
+        </div>
+         <div class="control-group">
+            <label for="angularDamping">Angular Damp:</label>
+            <input type="range" id="angularDamping" min="0.0" max="0.99" step="0.01">
+            <span class="value-display" id="angularDampingValue"></span>
+        </div>
+    </div>
+
+     <div id="debug" class="panel">Debug Info:</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- <script src="https://pmndrs.github.io/cannon-es-debugger/dist/cannon-es-debugger.js" type="module"></script> -->
+
+
+    <script type="module">
+
+        // import CannonDebugger from './cannon-es-debugger.js';
+
+        let initialWheelRadius = 0.70;
+        let wheelWidth = 0.3;
+        let initialSuspensionMaxTravel = 0.50;
+        let initialSuspensionRestDist = 0.80;
+        let initialMaxSteerAngleDeg = 35; // Use degrees for default
+        let steerSpeed = 1.5;
+        let initialEngineForce = 4000;
+        let brakeForceMultiplier = 100;
+        let handbrakeForceMultiplier = 50;
+        let maxGripFactor = 0.85;
+        let minGripFactor = 0.05;
+        let gripFalloffSpeed = 2.0;
+        let engineIdleThrottle = 0.05;
+        let initialSuspMountPointYOffset = 0.40;
+        let initialFrontTrackWidth = 2.20;
+        let initialRearTrackWidth = 2.20;
+        let initialCarMass = 1200;
+        let initialMaxWheelDrop = 0.15;
+
+        const initialDefaultParams = {
+            springStrength: 45000,
+            springDamper: 10, // Updated Default
+            engineForce: initialEngineForce,
+            brakeForceMultiplier: brakeForceMultiplier,
+            handbrakeForceMultiplier: handbrakeForceMultiplier,
+            maxGripFactor: maxGripFactor,
+            minGripFactor: minGripFactor,
+            gripFalloffSpeed: gripFalloffSpeed,
+            maxSteerAngle: initialMaxSteerAngleDeg * Math.PI / 180, // Convert default deg to rad
+            steerSpeed: steerSpeed,
+            linearDamping: 0.200, // Updated Default
+            angularDamping: 0.200, // Updated Default
+            suspensionMountPointYOffset: initialSuspMountPointYOffset,
+            wheelRadius: initialWheelRadius,
+            suspensionRestDist: initialSuspensionRestDist,
+            suspensionMaxTravel: initialSuspensionMaxTravel,
+            frontTrackWidth: initialFrontTrackWidth,
+            rearTrackWidth: initialRearTrackWidth,
+            carMass: initialCarMass,
+            maxWheelDrop: initialMaxWheelDrop
+        };
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+        scene.add(new THREE.AmbientLight(0xaaaaaa));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight.position.set(25, 40, 35);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 10; dirLight.shadow.camera.far = 100;
+        dirLight.shadow.camera.left = -60; dirLight.shadow.camera.right = 60;
+        dirLight.shadow.camera.top = 60; dirLight.shadow.camera.bottom = -60;
+        scene.add(dirLight); scene.add(dirLight.target);
+        scene.fog = new THREE.Fog(0x87CEEB, 80, 250);
+
+        const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+        orbitControls.enableDamping = true;
+        orbitControls.dampingFactor = 0.1;
+        orbitControls.screenSpacePanning = false;
+        orbitControls.maxPolarAngle = Math.PI / 2 - 0.05;
+        orbitControls.minDistance = 5;
+        orbitControls.maxDistance = 50;
+
+        const world = new CANNON.World();
+        world.gravity.set(0, -9.82, 0);
+        world.broadphase = new CANNON.SAPBroadphase(world);
+        world.solver.iterations = 15;
+        world.allowSleep = true;
+
+        // let cannonDebugger = null;
+        // try {
+        //    cannonDebugger = new CannonDebugger(scene, world, { color: 0x00ff00, scale: 1.01 });
+        // } catch (e) {
+        //    console.warn("CannonDebugger could not be loaded:", e);
+        // }
+
+        const groundPhysMaterial = new CANNON.Material("ground");
+        const carChassisMaterial = new CANNON.Material("chassis");
+        const boxMaterial = new CANNON.Material("box");
+        const sphereMaterial = new CANNON.Material("sphere");
+        const treeMaterial = new CANNON.Material("tree");
+
+        const chassisGroundContact = new CANNON.ContactMaterial(carChassisMaterial, groundPhysMaterial, { friction: 0.0, restitution: 0.1 });
+        const boxGroundContact = new CANNON.ContactMaterial(boxMaterial, groundPhysMaterial, { friction: 0.4, restitution: 0.2 });
+        const boxCarContact = new CANNON.ContactMaterial(boxMaterial, carChassisMaterial, { friction: 0.0, restitution: 0.3 });
+        const sphereGroundContact = new CANNON.ContactMaterial(sphereMaterial, groundPhysMaterial, { friction: 0.3, restitution: 0.5 });
+        const sphereCarContact = new CANNON.ContactMaterial(sphereMaterial, carChassisMaterial, { friction: 0.0, restitution: 0.4 });
+        const sphereBoxContact = new CANNON.ContactMaterial(sphereMaterial, boxMaterial, { friction: 0.2, restitution: 0.4 });
+        const sphereSphereContact = new CANNON.ContactMaterial(sphereMaterial, sphereMaterial, { friction: 0.3, restitution: 0.6 });
+        const treeCarContact = new CANNON.ContactMaterial(treeMaterial, carChassisMaterial, { friction: 0.6, restitution: 0.05, contactEquationStiffness: 1e7, contactEquationRelaxation: 4 });
+        const treeBoxContact = new CANNON.ContactMaterial(treeMaterial, boxMaterial, { friction: 0.3, restitution: 0.1 });
+        const treeSphereContact = new CANNON.ContactMaterial(treeMaterial, sphereMaterial, { friction: 0.2, restitution: 0.3 });
+        const treeTreeContact = new CANNON.ContactMaterial(treeMaterial, treeMaterial, { friction: 0.3, restitution: 0.1 });
+
+        world.addContactMaterial(chassisGroundContact);
+        world.addContactMaterial(boxGroundContact);
+        world.addContactMaterial(boxCarContact);
+        world.addContactMaterial(sphereGroundContact);
+        world.addContactMaterial(sphereCarContact);
+        world.addContactMaterial(sphereBoxContact);
+        world.addContactMaterial(sphereSphereContact);
+        world.addContactMaterial(treeCarContact);
+        world.addContactMaterial(treeBoxContact);
+        world.addContactMaterial(treeSphereContact);
+        world.addContactMaterial(treeTreeContact);
+
+
+        const groundBody = new CANNON.Body({ mass: 0, material: groundPhysMaterial, collisionFilterGroup: 1, collisionFilterMask: -1 });
+        groundBody.addShape(new CANNON.Plane());
+        groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+        world.addBody(groundBody);
+        const groundMaterial3D = new THREE.MeshStandardMaterial({ color: 0xbbbbbb, roughness: 0.85, metalness: 0.1 });
+        const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), groundMaterial3D);
+        groundMesh.rotation.x = -Math.PI / 2; groundMesh.receiveShadow = true; scene.add(groundMesh);
+
+        let chassisWidth = 1.8; let chassisHeight = 0.8; let chassisLength = 4;
+        const chassisShape = new CANNON.Box(new CANNON.Vec3(chassisWidth * 0.5, chassisHeight * 0.5, chassisLength * 0.5));
+        const carBody = new CANNON.Body({
+             mass: initialDefaultParams.carMass,
+             material: carChassisMaterial,
+             linearDamping: initialDefaultParams.linearDamping,
+             angularDamping: initialDefaultParams.angularDamping,
+             collisionFilterGroup: 2,
+             collisionFilterMask: 1 | 4 | 8 | 16
+        });
+        carBody.addShape(chassisShape);
+        carBody.position.set(-30, 1.5, 0);
+        carBody.allowSleep = false;
+        world.addBody(carBody);
+
+        const carMesh = new THREE.Group();
+        const chassisGeometry = new THREE.BoxGeometry(chassisWidth, chassisHeight, chassisLength);
+        const chassisMaterial = new THREE.MeshStandardMaterial({ color: 0xdd4444, roughness: 0.3, metalness: 0.5 });
+        const chassisMesh = new THREE.Mesh(chassisGeometry, chassisMaterial);
+        chassisMesh.castShadow = true; chassisMesh.receiveShadow = true;
+        carMesh.add(chassisMesh);
+        const cockpitGeo = new THREE.BoxGeometry(chassisWidth * 0.8, chassisHeight * 0.8, chassisLength * 0.5);
+        const cockpitMat = new THREE.MeshStandardMaterial({ color: 0x444455, roughness: 0.6, metalness: 0.2 });
+        const cockpitMesh = new THREE.Mesh(cockpitGeo, cockpitMat);
+        cockpitMesh.position.z = -chassisLength * 0.1; cockpitMesh.position.y = chassisHeight * 0.4; cockpitMesh.castShadow = true;
+        carMesh.add(cockpitMesh);
+        scene.add(carMesh);
+
+        const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x181818, roughness: 0.7, metalness: 0.1 });
+        const wheels = [];
+        const wheelInfos = [];
+        const wheelbase = chassisLength * 0.7;
+
+        const wheelBasePositions = [
+            { y: -chassisHeight / 2, z: wheelbase / 2, isFront: true, isLeft: true },
+            { y: -chassisHeight / 2, z: wheelbase / 2, isFront: true, isLeft: false },
+            { y: -chassisHeight / 2, z: -wheelbase / 2, isFront: false, isLeft: true },
+            { y: -chassisHeight / 2, z: -wheelbase / 2, isFront: false, isLeft: false }
+        ];
+
+         wheelBasePositions.forEach((posInfo) => {
+            const wheelGeometry = new THREE.CylinderGeometry(initialDefaultParams.wheelRadius, initialDefaultParams.wheelRadius, wheelWidth, 24);
+            wheelGeometry.rotateZ(Math.PI / 2);
+            const wheelMesh = new THREE.Mesh(wheelGeometry, wheelMaterial);
+            wheelMesh.castShadow = true; wheelMesh.receiveShadow = true;
+
+            const initialTrack = posInfo.isFront ? initialDefaultParams.frontTrackWidth : initialDefaultParams.rearTrackWidth;
+            const initialX = (posInfo.isLeft ? -1 : 1) * initialTrack / 2;
+            const initialY = posInfo.y + initialDefaultParams.suspensionMountPointYOffset;
+            const connectionPoint = new CANNON.Vec3(initialX, initialY, posInfo.z);
+
+            const tempPos = new CANNON.Vec3();
+            carBody.position.vadd(carBody.quaternion.vmult(connectionPoint), tempPos);
+            wheelMesh.position.copy(cannonToThree(tempPos));
+
+            scene.add(wheelMesh);
+            wheels.push(wheelMesh);
+
+            wheelInfos.push({
+                isFront: posInfo.isFront,
+                isLeft: posInfo.isLeft,
+                baseChassisConnectionPointLocal: new CANNON.Vec3(initialX, posInfo.y, posInfo.z),
+                chassisConnectionPointLocal: connectionPoint.clone(),
+                raycastResult: new CANNON.RaycastResult(),
+                worldPos: new CANNON.Vec3(),
+                hitPoint: new CANNON.Vec3(),
+                steeringAngle: 0,
+                visualWheel: wheelMesh,
+                lastSuspensionLength: initialDefaultParams.suspensionRestDist,
+                isInContact: false,
+                slipVelocity: 0
+            });
+        });
+
+        const raycastLines = [];
+        const hitPointMarkers = [];
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2, depthTest: false, depthWrite: false });
+        const markerMaterial = new THREE.PointsMaterial({ color: 0x00ff00, size: 0.2, sizeAttenuation: true, depthTest: false, depthWrite: false });
+        const markerGeometry = new THREE.BufferGeometry();
+        markerGeometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+        const treeDebugHelpers = [];
+        const treeDebugColor = 0x0000ff;
+
+
+        for (let i = 0; i < 4; i++) {
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(2 * 3), 3));
+            const line = new THREE.Line(geometry, lineMaterial);
+            line.renderOrder = 999;
+            line.visible = true;
+            scene.add(line);
+            raycastLines.push(line);
+
+            const marker = new THREE.Points(markerGeometry, markerMaterial);
+            marker.renderOrder = 1000;
+            marker.visible = false;
+            scene.add(marker);
+            hitPointMarkers.push(marker);
+        }
+
+        const controls = { forward: 0, backward: 0, left: 0, right: 0, handbrake: false };
+        document.addEventListener('keydown', (event) => {
+            if (event.repeat) return;
+            switch(event.key.toLowerCase()) {
+                case 'w': controls.forward = 1; break;
+                case 's': controls.backward = 1; break;
+                case 'a': controls.left = 1; break;
+                case 'd': controls.right = 1; break;
+                case ' ': controls.handbrake = true; break;
+                case 'r': resetCar(); break;
+                case 'f': triggerManualFlip(); break;
+            }
+        });
+        document.addEventListener('keyup', (event) => {
+             switch(event.key.toLowerCase()) {
+                case 'w': controls.forward = 0; break;
+                case 's': controls.backward = 0; break;
+                case 'a': controls.left = 0; break;
+                case 'd': controls.right = 0; break;
+                case ' ': controls.handbrake = false; break;
+            }
+        });
+
+        const tuningParams = {};
+        const tuningControls = [
+            { id: 'carMass',         paramName: 'carMass', isBodyProperty: true, precision: 0 },
+            { id: 'engineForce',     paramName: 'engineForce', factor: 1, precision: 0 },
+            { id: 'springStrength',  paramName: 'springStrength', factor: 1, precision: 0 },
+            { id: 'springDamper',    paramName: 'springDamper', factor: 1, precision: 0 },
+            { id: 'suspensionRestDist', paramName: 'suspensionRestDist', factor: 1, precision: 2 },
+            { id: 'suspensionMaxTravel', paramName: 'suspensionMaxTravel', factor: 1, precision: 2 },
+            { id: 'maxWheelDrop', paramName: 'maxWheelDrop', factor: 1, precision: 2 },
+            { id: 'suspMountPointYOffset', paramName: 'suspensionMountPointYOffset', factor: 1, precision: 2 },
+            { id: 'wheelRadius',     paramName: 'wheelRadius', factor: 1, precision: 2 },
+            { id: 'frontTrackWidth', paramName: 'frontTrackWidth', factor: 1, precision: 2 },
+            { id: 'rearTrackWidth',  paramName: 'rearTrackWidth', factor: 1, precision: 2 },
+            { id: 'brakeForceMult',  paramName: 'brakeForceMultiplier', factor: 1, precision: 0 },
+            { id: 'handbrakeForceMult', paramName: 'handbrakeForceMultiplier', factor: 1, precision: 0 },
+            { id: 'maxGripFactor',   paramName: 'maxGripFactor', factor: 1, precision: 2 },
+            { id: 'minGripFactor',   paramName: 'minGripFactor', factor: 1, precision: 2 },
+            { id: 'gripFalloffSpeed',paramName: 'gripFalloffSpeed', factor: 1, precision: 1 },
+            { id: 'maxSteerAngleDeg',paramName: 'maxSteerAngle', factor: Math.PI / 180, precision: 0 },
+            { id: 'steerSpeed',      paramName: 'steerSpeed', factor: 1, precision: 1 },
+            { id: 'linearDamping',   paramName: 'linearDamping', isBodyProperty: true, precision: 3 },
+            { id: 'angularDamping',  paramName: 'angularDamping', isBodyProperty: true, precision: 3 }
+        ];
+
+        function initializeTuningParams() {
+            tuningControls.forEach(control => {
+                if (!control.isBodyProperty) {
+                    tuningParams[control.paramName] = initialDefaultParams[control.paramName];
+                } else if (control.paramName === 'carMass') {
+                    tuningParams.carMass = initialDefaultParams.carMass;
+                }
+            });
+        }
+
+        function updateWheelConnectionX(isFront, newTrackWidth) {
+             wheelInfos.forEach(info => {
+                 if (info.isFront === isFront) {
+                    info.baseChassisConnectionPointLocal.x = (info.isLeft ? -1 : 1) * newTrackWidth / 2;
+                    info.chassisConnectionPointLocal.x = info.baseChassisConnectionPointLocal.x;
+                 }
+             });
+        }
+
+        function setupTuningListeners() {
+            tuningControls.forEach(control => {
+                const slider = document.getElementById(control.id);
+                const display = document.getElementById(control.id + 'Value');
+                if (slider && display) {
+                     let initialValue = initialDefaultParams[control.paramName];
+                     // Special case for maxSteerAngle slider display (show degrees)
+                     let sliderDisplayValue = control.paramName === 'maxSteerAngle'
+                         ? initialValue / (Math.PI / 180)
+                         : (control.factor && control.factor !== 1) ? (initialValue / control.factor) : initialValue;
+
+                     slider.value = sliderDisplayValue;
+                     display.textContent = parseFloat(sliderDisplayValue).toFixed(control.precision);
+
+                     slider.addEventListener('input', (event) => {
+                         const newSliderValue = parseFloat(event.target.value);
+                         if (isNaN(newSliderValue)) return;
+
+                         let newParamValue = (control.factor && control.factor !== 1) ? (newSliderValue * control.factor) : newSliderValue;
+                         if (isNaN(newParamValue)) return;
+
+                         if(control.isBodyProperty){
+                             if ((control.paramName === 'linearDamping' || control.paramName === 'angularDamping') && newParamValue >= 0.99) {
+                                 newParamValue = 0.99;
+                             }
+                             carBody[control.paramName] = newParamValue;
+                             if(control.paramName === 'carMass') {
+                                 carBody.updateMassProperties();
+                                 tuningParams.carMass = newParamValue;
+                             }
+
+                         } else {
+                             tuningParams[control.paramName] = newParamValue;
+
+                             if (control.paramName === 'wheelRadius') {
+                                 const scaleFactor = newParamValue / initialDefaultParams.wheelRadius;
+                                 wheels.forEach(visualWheel => {
+                                     visualWheel.scale.set(1, scaleFactor, scaleFactor);
+                                 });
+                             } else if (control.paramName === 'frontTrackWidth') {
+                                 updateWheelConnectionX(true, newParamValue);
+                             } else if (control.paramName === 'rearTrackWidth') {
+                                 updateWheelConnectionX(false, newParamValue);
+                             }
+                         }
+                         display.textContent = (control.isBodyProperty && newParamValue === 0.99)
+                            ? "0.99"
+                            : newSliderValue.toFixed(control.precision);
+
+                     });
+                } else { console.error("Missing tuning element:", control.id); }
+            });
+        }
+
+
+        function resetCar() {
+            carBody.position.set(-30, 1.5, 0);
+            carBody.velocity.set(0, 0, 0); carBody.angularVelocity.set(0, 0, 0); carBody.quaternion.set(0, 0, 0, 1);
+            carBody.mass = initialDefaultParams.carMass;
+            carBody.linearDamping = initialDefaultParams.linearDamping;
+            carBody.angularDamping = initialDefaultParams.angularDamping;
+            carBody.updateMassProperties();
+            carBody.wakeUp();
+
+            isStuckOnSideOrRoof = false;
+            stuckTimer = 0;
+
+            wheelInfos.forEach(info => {
+                info.steeringAngle = 0;
+                info.lastSuspensionLength = initialDefaultParams.suspensionRestDist;
+                info.slipVelocity = 0;
+
+                const defaultTrack = info.isFront ? initialDefaultParams.frontTrackWidth : initialDefaultParams.rearTrackWidth;
+                info.baseChassisConnectionPointLocal.x = (info.isLeft ? -1 : 1) * defaultTrack / 2;
+                info.chassisConnectionPointLocal.x = info.baseChassisConnectionPointLocal.x;
+                info.chassisConnectionPointLocal.y = info.baseChassisConnectionPointLocal.y + initialDefaultParams.suspensionMountPointYOffset;
+            });
+
+             tuningControls.forEach(control => {
+                 const slider = document.getElementById(control.id);
+                 const display = document.getElementById(control.id + 'Value');
+                 if(slider && display) {
+                     let resetValue = initialDefaultParams[control.paramName];
+                     if (typeof resetValue === 'number') {
+                         if (!control.isBodyProperty) {
+                             tuningParams[control.paramName] = resetValue;
+                         } else if (control.paramName === 'carMass') {
+                              tuningParams.carMass = resetValue;
+                         }
+                         let displayValue = control.paramName === 'maxSteerAngle'
+                            ? resetValue / (Math.PI / 180)
+                            : (control.factor && control.factor !== 1) ? (resetValue / control.factor) : resetValue;
+
+                         slider.value = displayValue;
+                         display.textContent = parseFloat(displayValue).toFixed(control.precision);
+                     } else {
+                        console.error("Error finding default value during reset for:", control.id, control.paramName);
+                        display.textContent = "ERR";
+                    }
+                 }
+            });
+
+             const defaultScaleFactor = initialDefaultParams.wheelRadius / initialDefaultParams.wheelRadius;
+             wheels.forEach(visualWheel => {
+                 visualWheel.scale.set(1, defaultScaleFactor, defaultScaleFactor);
+             });
+
+             const initialCarPos = new CANNON.Vec3(-30, 1.5, 0);
+             const behindOffset = new THREE.Vector3(0, 6, -14);
+             camera.position.copy(cannonToThree(initialCarPos)).add(behindOffset);
+             orbitControls.target.copy(cannonToThree(initialCarPos));
+             orbitControls.update();
+
+             boxes.forEach(boxInfo => {
+                 boxInfo.body.position.copy(boxInfo.initialPosition);
+                 boxInfo.body.quaternion.copy(boxInfo.initialQuaternion);
+                 boxInfo.body.velocity.set(0, 0, 0);
+                 boxInfo.body.angularVelocity.set(0, 0, 0);
+                 boxInfo.body.wakeUp();
+             });
+             spheres.forEach(sphereInfo => {
+                 sphereInfo.body.position.copy(sphereInfo.initialPosition);
+                 sphereInfo.body.quaternion.copy(sphereInfo.initialQuaternion);
+                 sphereInfo.body.velocity.set(0, 0, 0);
+                 sphereInfo.body.angularVelocity.set(0, 0, 0);
+                 sphereInfo.body.wakeUp();
+             });
+        }
+
+        const speedElement = document.getElementById('speed');
+        const slipElements = [];
+         wheelBasePositions.forEach((p,i) => slipElements.push(document.getElementById(`slip_${['fl','fr','rl','rr'][i]}`)));
+        const debugElement = document.getElementById('debug');
+
+        const _cannonVec3_1 = new CANNON.Vec3(); const _cannonVec3_2 = new CANNON.Vec3();
+        const _cannonVec3_3 = new CANNON.Vec3(); const _cannonVec3_4 = new CANNON.Vec3();
+        const _cannonVec3_5 = new CANNON.Vec3();
+        const _cannonVec3_Up = new CANNON.Vec3(0, 1, 0); const _cannonVec3_Right = new CANNON.Vec3(1, 0, 0);
+        const _cannonVec3_Forward = new CANNON.Vec3(0, 0, 1);
+        const _cannonQuat_1 = new CANNON.Quaternion();
+        const _threeVec3_Temp1 = new THREE.Vector3();
+        const _threeVec3_Temp2 = new THREE.Vector3();
+        const _threeVec3_HangingPos = new THREE.Vector3();
+
+
+        function cannonToThree(vec, target = null) { if (target) { target.set(vec.x, vec.y, vec.z); return target; } return new THREE.Vector3(vec.x, vec.y, vec.z); }
+
+        function calculateSuspensionForce(wheelInfo, rayHit, timeStep) {
+            const currentLength = rayHit.distance;
+            const currentMaxTravel = tuningParams.suspensionMaxTravel;
+            const currentRestDist = tuningParams.suspensionRestDist;
+
+            const minAllowedLength = currentRestDist - currentMaxTravel;
+            const maxAllowedLength = currentRestDist;
+
+            const clampedLength = Math.max(minAllowedLength, Math.min(maxAllowedLength, currentLength));
+            const compression = currentRestDist - clampedLength;
+
+            const springVelocity = (timeStep > 1e-5) ? (wheelInfo.lastSuspensionLength - clampedLength) / timeStep : 0;
+            wheelInfo.lastSuspensionLength = clampedLength;
+
+            const springForceMag = compression * tuningParams.springStrength;
+            const dampingForceMag = springVelocity * tuningParams.springDamper;
+
+            let totalForceMag = springForceMag - dampingForceMag;
+
+            if (totalForceMag < 0 && clampedLength >= currentRestDist - 0.001) {
+                totalForceMag = 0;
+            }
+
+            carBody.vectorToWorldFrame(_cannonVec3_Up, _cannonVec3_1);
+            _cannonVec3_1.scale(totalForceMag, _cannonVec3_2);
+            carBody.applyForce(_cannonVec3_2, rayHit.hitPointWorld);
+        }
+
+        function calculateSteeringForce(wheelInfo, rayHit, timeStep) {
+            const tireWorldVel = _cannonVec3_3;
+            carBody.getVelocityAtWorldPoint(rayHit.hitPointWorld, tireWorldVel);
+            const steeringDirWorld = _cannonVec3_1;
+            carBody.vectorToWorldFrame(_cannonVec3_Right, steeringDirWorld);
+            const upDirWorld = _cannonVec3_2;
+            carBody.vectorToWorldFrame(_cannonVec3_Up, upDirWorld);
+            if (wheelInfo.isFront) {
+                 _cannonQuat_1.setFromAxisAngle(upDirWorld, wheelInfo.steeringAngle);
+                steeringDirWorld.copy(_cannonQuat_1.vmult(steeringDirWorld));
+            }
+            const steeringVelMag = tireWorldVel.dot(steeringDirWorld);
+            wheelInfo.slipVelocity = steeringVelMag;
+            const slipRatio = Math.min(1.0, Math.abs(steeringVelMag) / tuningParams.gripFalloffSpeed);
+            let currentGripFactor = THREE.MathUtils.lerp(tuningParams.maxGripFactor, tuningParams.minGripFactor, slipRatio);
+             if (controls.handbrake && !wheelInfo.isFront) {
+                 currentGripFactor = tuningParams.minGripFactor * 0.5;
+             }
+            const desiredVelChange = -steeringVelMag * currentGripFactor;
+            const desiredAccelMag = (timeStep > 1e-5) ? (desiredVelChange / timeStep) : 0;
+            const tireEffectiveMass = carBody.mass / 4.0;
+            let steeringForceMag = tireEffectiveMass * desiredAccelMag;
+            const maxLateralForce = 20000;
+            steeringForceMag = Math.max(-maxLateralForce, Math.min(maxLateralForce, steeringForceMag));
+            steeringDirWorld.scale(steeringForceMag, _cannonVec3_4);
+            carBody.applyForce(_cannonVec3_4, rayHit.hitPointWorld);
+         }
+         function calculateAccelerationBrakingForce(wheelInfo, rayHit) {
+            const forwardDirWorld = _cannonVec3_1;
+            carBody.vectorToWorldFrame(_cannonVec3_Forward, forwardDirWorld);
+            const upDirWorld = _cannonVec3_2;
+             carBody.vectorToWorldFrame(_cannonVec3_Up, upDirWorld);
+            if (wheelInfo.isFront) {
+                 _cannonQuat_1.setFromAxisAngle(upDirWorld, wheelInfo.steeringAngle);
+                forwardDirWorld.copy(_cannonQuat_1.vmult(forwardDirWorld));
+            }
+            let forwardForceMag = 0;
+            const isDrivenWheel = !wheelInfo.isFront;
+            if (isDrivenWheel) {
+                if (controls.forward > 0.1) {
+                    forwardForceMag += tuningParams.engineForce * controls.forward;
+                 } else if (controls.backward < 0.1 && !controls.handbrake) {
+                    forwardForceMag += tuningParams.engineForce * engineIdleThrottle * Math.max(0, (1.0 - Math.abs(wheelInfo.steeringAngle / (tuningParams.maxSteerAngle * 2))));
+                }
+            }
+            const tireWorldVel = _cannonVec3_3;
+             carBody.getVelocityAtWorldPoint(rayHit.hitPointWorld, tireWorldVel);
+            const forwardVelMag = tireWorldVel.dot(forwardDirWorld);
+            if (controls.backward > 0.1) {
+                const brakeMag = Math.max(controls.backward, 0.1);
+                 if (forwardVelMag > 0.1) {
+                    forwardForceMag -= Math.abs(forwardVelMag) * tuningParams.brakeForceMultiplier * brakeMag;
+                } else {
+                    forwardForceMag -= tuningParams.engineForce * 0.6 * brakeMag;
+                 }
+            } else if (controls.handbrake && !wheelInfo.isFront){
+                if(forwardVelMag > 0.1) {
+                    forwardForceMag -= Math.abs(forwardVelMag) * tuningParams.handbrakeForceMultiplier;
+                 }
+             }
+             forwardDirWorld.scale(forwardForceMag, _cannonVec3_4);
+             carBody.applyForce(_cannonVec3_4, rayHit.hitPointWorld);
+         }
+
+        const clock = new THREE.Clock();
+        let currentSteer = 0;
+        const fixedTimeStep = 1 / 60;
+        const cameraLookAtTarget = new THREE.Vector3();
+        let isStuckOnSideOrRoof = false;
+        let stuckTimer = 0;
+        const stuckYThreshold = 0.5;
+        const stuckTimeThreshold = 1.0;
+
+        function triggerManualFlip() {
+            const worldUp = _cannonVec3_1;
+            carBody.vectorToWorldFrame(_cannonVec3_Up, worldUp);
+
+            const currentY = carBody.position.y;
+            const deltaY = Math.max(0, 1.0 - worldUp.y); // Add more height if more upside down
+
+            carBody.quaternion.set(0, carBody.quaternion.y, 0, 1);
+            carBody.quaternion.normalize();
+            carBody.angularVelocity.set(0,0,0);
+            carBody.position.y = currentY + 0.5 + deltaY; // Pop it up a bit more if needed
+            carBody.wakeUp();
+
+            isStuckOnSideOrRoof = false;
+            stuckTimer = 0;
+        }
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+
+            let targetSteer = 0;
+             if (controls.left) targetSteer = tuningParams.maxSteerAngle;
+             if (controls.right) targetSteer = -tuningParams.maxSteerAngle;
+            currentSteer = THREE.MathUtils.lerp(currentSteer, targetSteer, tuningParams.steerSpeed * dt * 10);
+
+            const currentSuspMountYOffset = tuningParams.suspensionMountPointYOffset;
+            wheelInfos.forEach((info) => {
+                info.chassisConnectionPointLocal.y = info.baseChassisConnectionPointLocal.y + currentSuspMountYOffset;
+            });
+
+            world.step(fixedTimeStep);
+
+            carBody.wakeUp();
+            boxes.forEach(b => b.body.wakeUp());
+            spheres.forEach(s => s.body.wakeUp());
+
+            const localUp = _cannonVec3_Up;
+            const worldUp = _cannonVec3_1;
+            carBody.vectorToWorldFrame(localUp, worldUp);
+
+            if (worldUp.y < stuckYThreshold) {
+                if (carBody.velocity.lengthSquared() < 0.1 && carBody.angularVelocity.lengthSquared() < 0.1) {
+                     stuckTimer += dt;
+                     if (stuckTimer > stuckTimeThreshold) {
+                         triggerManualFlip();
+                     }
+                } else {
+                    stuckTimer = 0;
+                }
+            } else {
+                isStuckOnSideOrRoof = false;
+                stuckTimer = 0;
+            }
+
+
+            let debugText = '';
+             wheelInfos.forEach((info, index) => {
+                info.steeringAngle = info.isFront ? currentSteer : 0;
+
+                carBody.pointToWorldFrame(info.chassisConnectionPointLocal, info.worldPos);
+                const rayDirectionWorld = _cannonVec3_2;
+                carBody.vectorToWorldFrame(new CANNON.Vec3(0,-1,0), rayDirectionWorld);
+                const rayStartWorld = info.worldPos;
+
+                const rayEndWorldPhysics = _cannonVec3_3;
+                const rayEndWorldDebug = _cannonVec3_4;
+
+                const physicsRayLength = tuningParams.suspensionRestDist + tuningParams.suspensionMaxTravel + tuningParams.wheelRadius * 1.5;
+                rayDirectionWorld.scale(physicsRayLength, _cannonVec3_5);
+                rayStartWorld.vadd(_cannonVec3_5, rayEndWorldPhysics);
+
+                const debugLineLength = tuningParams.suspensionRestDist + tuningParams.suspensionMaxTravel;
+                rayDirectionWorld.scale(debugLineLength, _cannonVec3_5);
+                rayStartWorld.vadd(_cannonVec3_5, rayEndWorldDebug);
+
+                info.raycastResult.reset();
+                world.raycastClosest(rayStartWorld, rayEndWorldPhysics, { collisionFilterGroup: -1, collisionFilterMask: 1 | 4 | 8 }, info.raycastResult);
+                info.isInContact = info.raycastResult.hasHit;
+
+                let effectiveContact = info.isInContact;
+                let physicsRayHit = null;
+                if (info.isInContact) {
+                    if (info.raycastResult.distance <= tuningParams.suspensionRestDist + tuningParams.maxWheelDrop) {
+                         effectiveContact = true;
+                         physicsRayHit = info.raycastResult;
+                    } else {
+                         effectiveContact = false;
+                    }
+                } else {
+                    effectiveContact = false;
+                }
+
+                const line = raycastLines[index];
+                const marker = hitPointMarkers[index];
+                const positions = line.geometry.attributes.position.array;
+                cannonToThree(rayStartWorld, _threeVec3_Temp1);
+                cannonToThree(rayEndWorldDebug, _threeVec3_Temp2);
+                positions[0] = _threeVec3_Temp1.x; positions[1] = _threeVec3_Temp1.y; positions[2] = _threeVec3_Temp1.z;
+                positions[3] = _threeVec3_Temp2.x; positions[4] = _threeVec3_Temp2.y; positions[5] = _threeVec3_Temp2.z;
+                line.geometry.attributes.position.needsUpdate = true;
+
+                if (effectiveContact && physicsRayHit) {
+                     info.hitPoint.copy(physicsRayHit.hitPointWorld);
+                     cannonToThree(info.hitPoint, marker.position);
+                     marker.visible = true;
+                     marker.material.color.setHex(0x00ff00);
+
+                     calculateSuspensionForce(info, physicsRayHit, fixedTimeStep);
+                     calculateSteeringForce(info, physicsRayHit, fixedTimeStep);
+                     calculateAccelerationBrakingForce(info, physicsRayHit, fixedTimeStep);
+                 } else {
+                     marker.visible = false;
+                     info.lastSuspensionLength = tuningParams.suspensionRestDist;
+                     info.slipVelocity = 0;
+                 }
+                 info.isInContact = effectiveContact;
+
+                 if (slipElements[index]) { slipElements[index].textContent = `${['FL','FR','RL','RR'][index]} Slip: ${info.slipVelocity.toFixed(2)}`; }
+                 debugText += `${['FL','FR','RL','RR'][index]} C:${info.isInContact?'Y':'N'} L:${info.lastSuspensionLength.toFixed(2)} St:${info.steeringAngle.toFixed(2)}<br>`;
+             });
+            if(isStuckOnSideOrRoof) debugText += `Flipping soon... (${stuckTimer.toFixed(1)}s)<br>`;
+            debugElement.innerHTML = "Debug Info:<br>" + debugText;
+
+
+            cannonToThree(carBody.position, carMesh.position);
+            carMesh.quaternion.copy(carBody.quaternion);
+
+             wheelInfos.forEach(info => {
+                 const visualWheel = info.visualWheel;
+                 const currentRadius = tuningParams.wheelRadius;
+                 const connectionWorldPos = _cannonVec3_1;
+                 carBody.pointToWorldFrame(info.chassisConnectionPointLocal, connectionWorldPos);
+                 const maxDropLimitY = connectionWorldPos.y - tuningParams.maxWheelDrop - currentRadius;
+
+                 let targetWheelPos = _cannonVec3_5;
+
+                 if (info.isInContact) {
+                     const upDirWorld = _cannonVec3_2;
+                     carBody.vectorToWorldFrame(_cannonVec3_Up, upDirWorld);
+                     info.hitPoint.vadd(upDirWorld.scale(currentRadius), targetWheelPos);
+                 } else {
+                    const downDirWorld = _cannonVec3_2;
+                    carBody.vectorToWorldFrame(new CANNON.Vec3(0,-1,0), downDirWorld);
+                    info.worldPos.vadd(downDirWorld.scale(tuningParams.suspensionRestDist - currentRadius), targetWheelPos);
+                 }
+
+                 targetWheelPos.y = Math.max(maxDropLimitY, targetWheelPos.y);
+                 cannonToThree(targetWheelPos, visualWheel.position);
+
+
+                 visualWheel.quaternion.copy(carBody.quaternion);
+                  const steerRot = _cannonQuat_1;
+                 steerRot.setFromAxisAngle(_cannonVec3_Up, info.steeringAngle);
+                  const threeSteerQuat = new THREE.Quaternion(steerRot.x, steerRot.y, steerRot.z, steerRot.w);
+                 visualWheel.quaternion.multiply(threeSteerQuat);
+
+                 const wheelAxis = new THREE.Vector3(1, 0, 0);
+                 const wheelWorldVel = _cannonVec3_2;
+                 carBody.getVelocityAtWorldPoint(info.isInContact ? info.hitPoint : info.worldPos, wheelWorldVel);
+                 const forwardDirWorldTHREE = _threeVec3_Temp1;
+                 visualWheel.getWorldDirection(forwardDirWorldTHREE);
+                 const forwardSpeedComponent = cannonToThree(wheelWorldVel).dot(forwardDirWorldTHREE);
+                 const wheelCircumference = 2 * Math.PI * currentRadius;
+                 const wheelAngularDelta = wheelCircumference > 0.01 ? (forwardSpeedComponent * dt) / currentRadius : 0;
+                 visualWheel.rotateOnAxis(wheelAxis, -wheelAngularDelta);
+             });
+
+             boxes.forEach(boxInfo => {
+                boxInfo.mesh.position.copy(boxInfo.body.position);
+                boxInfo.mesh.quaternion.copy(boxInfo.body.quaternion);
+             });
+             spheres.forEach(sphereInfo => {
+                 sphereInfo.mesh.position.copy(sphereInfo.body.position);
+                 sphereInfo.mesh.quaternion.copy(sphereInfo.body.quaternion);
+             });
+             treeDebugHelpers.forEach(helper => {
+                helper.update();
+             });
+
+
+            dirLight.target.position.copy(carMesh.position);
+
+            const cameraLookAtOffset = _threeVec3_Temp1.set(0, 0.8, 0);
+            cameraLookAtTarget.copy(carMesh.position).add(cameraLookAtOffset);
+
+            orbitControls.target.lerp(cameraLookAtTarget, 0.6);
+            orbitControls.update();
+
+            // Optional: Update Cannon Debugger visuals
+            // cannonDebugger?.update();
+
+            const speed = carBody.velocity.length() * 3.6;
+            speedElement.textContent = `Speed: ${Math.floor(speed)} km/h`;
+
+            clouds.forEach(cloud => { cloud.rotation.y += (0.0001 + Math.random() * 0.00005) * 60 * dt; });
+
+            renderer.render(scene, camera);
+        }
+
+        // Scenery Functions
+        const createCloud = (x, y, z) => {
+            const cloudGroup = new THREE.Group(); const cloudMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+            for (let i = 0; i < Math.random() * 6 + 4; i++) {
+                const radius = Math.random() * 5 + 4; const cloudGeometry = new THREE.SphereGeometry(radius, 16, 16);
+                const cloudPiece = new THREE.Mesh(cloudGeometry, cloudMaterial);
+                cloudPiece.position.set( Math.random() * 20 - 10, Math.random() * 5 - 2.5, Math.random() * 20 - 10 );
+                cloudGroup.add(cloudPiece);
+            } cloudGroup.position.set(x, y, z); scene.add(cloudGroup); return cloudGroup;
+        };
+        const clouds = [];
+         for (let i = 0; i < 15; i++) clouds.push(createCloud(-200+Math.random()*400, 50+Math.random()*40, -200+Math.random()*400));
+
+        const createTree = (x, z) => {
+             const treeGroup = new THREE.Group();
+             const trunkHeight = Math.random() * 4 + 4;
+             const trunkRadius = trunkHeight / 10;
+             const trunkTopRadius = trunkRadius * 0.7;
+
+            const trunkGeometry = new THREE.CylinderGeometry(trunkTopRadius, trunkRadius, trunkHeight, 8);
+            const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x966F33 });
+            const trunkMesh = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            trunkMesh.position.y = trunkHeight / 2;
+            trunkMesh.castShadow = true;
+            treeGroup.add(trunkMesh);
+
+            const trunkHalfExtents = new CANNON.Vec3(trunkRadius, trunkHeight * 0.5, trunkRadius);
+            const trunkShape = new CANNON.Box(trunkHalfExtents);
+            const treeBody = new CANNON.Body({
+                 mass: 0,
+                 material: treeMaterial,
+                 collisionFilterGroup: 16,
+                 collisionFilterMask: 1 | 2 | 4 | 8
+            });
+            treeBody.addShape(trunkShape);
+            treeBody.position.set(x, trunkHeight / 2, z);
+            world.addBody(treeBody);
+
+            const boxHelper = new THREE.BoxHelper(trunkMesh, treeDebugColor);
+            boxHelper.material.depthTest = false;
+            boxHelper.material.depthWrite = false;
+            boxHelper.renderOrder = 998;
+            treeGroup.add(boxHelper);
+            treeDebugHelpers.push(boxHelper);
+
+
+            const leavesHeight = trunkHeight * 1.8 + Math.random() * 2;
+            const leavesRadius = leavesHeight / 3.5;
+            const leavesGeometry = new THREE.ConeGeometry(leavesRadius, leavesHeight, 8);
+            const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x33a033 });
+            const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+            leaves.position.y = trunkHeight + leavesHeight / 2 - 1.5;
+            leaves.castShadow = true;
+            treeGroup.add(leaves);
+
+            treeGroup.position.set(x, 0, z);
+            scene.add(treeGroup);
+        };
+         for (let i = 0; i < 150; i++) {
+             const angle = Math.random() * Math.PI * 2; const dist = 40 + Math.random() * 150;
+             let x = Math.cos(angle) * dist; let z = Math.sin(angle) * dist;
+             if(Math.abs(x) < 35 && Math.abs(z) < 25) {
+                 x += Math.sign(x) * 35 || (Math.random() > 0.5 ? 35 : -35);
+                 z += Math.sign(z) * 25 || (Math.random() > 0.5 ? 25 : -25);
+             }
+             if (x > -25 && x < 5 && z > -5 && z < 15) { continue; }
+             if (x > -5 && x < 15 && z > -25 && z < -15) { continue; }
+             createTree(x,z);
+         }
+
+         // Obstacles
+         const boxes = [];
+         function createBox(position, size = 1, mass = 5, color = 0xaaaaaa) {
+             const halfExtents = new CANNON.Vec3(size * 0.5, size * 0.5, size * 0.5);
+             const boxShape = new CANNON.Box(halfExtents);
+             const boxBody = new CANNON.Body({
+                 mass: mass,
+                 material: boxMaterial,
+                 collisionFilterGroup: 4,
+                 collisionFilterMask: -1
+             });
+             boxBody.addShape(boxShape);
+             boxBody.position.copy(position);
+             boxBody.linearDamping = 0.1;
+             boxBody.angularDamping = 0.2;
+             world.addBody(boxBody);
+
+             const boxGeometry = new THREE.BoxGeometry(size, size, size);
+             const boxMeshMaterial = new THREE.MeshStandardMaterial({ color: color, roughness: 0.6, metalness: 0.2 });
+             const boxMesh = new THREE.Mesh(boxGeometry, boxMeshMaterial);
+             boxMesh.castShadow = true;
+             boxMesh.receiveShadow = true;
+             boxMesh.position.copy(position);
+             scene.add(boxMesh);
+
+             boxes.push({
+                 mesh: boxMesh,
+                 body: boxBody,
+                 initialPosition: position.clone(),
+                 initialQuaternion: boxBody.quaternion.clone()
+             });
+         }
+
+         const spheres = [];
+         function createSphere(position, radius = 0.5, mass = 2, color = 0xeeeeee) {
+             const sphereShape = new CANNON.Sphere(radius);
+             const sphereBody = new CANNON.Body({
+                 mass: mass,
+                 material: sphereMaterial,
+                 collisionFilterGroup: 8,
+                 collisionFilterMask: -1
+             });
+             sphereBody.addShape(sphereShape);
+             sphereBody.position.copy(position);
+             sphereBody.linearDamping = 0.2;
+             sphereBody.angularDamping = 0.3;
+             world.addBody(sphereBody);
+
+             const sphereGeometry = new THREE.SphereGeometry(radius, 16, 16);
+             const sphereMeshMaterial = new THREE.MeshStandardMaterial({ color: color, roughness: 0.2, metalness: 0.1 });
+             const sphereMesh = new THREE.Mesh(sphereGeometry, sphereMeshMaterial);
+             sphereMesh.castShadow = true;
+             sphereMesh.receiveShadow = true;
+             sphereMesh.position.copy(position);
+             scene.add(sphereMesh);
+
+             spheres.push({
+                 mesh: sphereMesh,
+                 body: sphereBody,
+                 initialPosition: position.clone(),
+                 initialQuaternion: sphereBody.quaternion.clone()
+             });
+         }
+
+        function createRamp(position, size, angleDeg, color = 0xaaaaaa) {
+            const halfExtents = new CANNON.Vec3(size.x * 0.5, size.y * 0.5, size.z * 0.5);
+            const rampShape = new CANNON.Box(halfExtents);
+            const rampBody = new CANNON.Body({
+                mass: 0,
+                material: groundPhysMaterial,
+                collisionFilterGroup: 1,
+                collisionFilterMask: -1
+            });
+            rampBody.addShape(rampShape);
+            rampBody.position.copy(position);
+            const angleRad = angleDeg * Math.PI / 180;
+            rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), angleRad);
+            world.addBody(rampBody);
+
+            const rampGeometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+            const rampMeshMaterial = new THREE.MeshStandardMaterial({ color: color, roughness: 0.7, metalness: 0.1 });
+            const rampMesh = new THREE.Mesh(rampGeometry, rampMeshMaterial);
+            rampMesh.castShadow = true;
+            rampMesh.receiveShadow = true;
+            rampMesh.position.copy(position);
+            rampMesh.quaternion.copy(rampBody.quaternion);
+            scene.add(rampMesh);
+        }
+
+
+         const boxSize = 1.2;
+         createBox(new CANNON.Vec3(-10, boxSize * 0.5, 5), boxSize, 10, 0xcc8866);
+         createBox(new CANNON.Vec3(-10, boxSize * 1.5, 5), boxSize, 10, 0xccAA66);
+         createBox(new CANNON.Vec3(-10, boxSize * 2.5, 5), boxSize, 10, 0xccCC66);
+         createBox(new CANNON.Vec3(-11.2, boxSize * 0.5, 5), boxSize, 10, 0xdd9977);
+         createBox(new CANNON.Vec3(-11.2, boxSize * 1.5, 5), boxSize, 10, 0xddBB77);
+         createBox(new CANNON.Vec3(-8.8, boxSize * 0.5, 5), boxSize, 10, 0xaa7755);
+         createBox(new CANNON.Vec3(-8.8, boxSize * 1.5, 5), boxSize, 10, 0xbb8866);
+
+         createBox(new CANNON.Vec3(-12, boxSize * 0.5, 8), boxSize, 10, 0x6688cc);
+         createBox(new CANNON.Vec3(-12, boxSize * 1.5, 8), boxSize, 10, 0x66AAcc);
+         createBox(new CANNON.Vec3(-13.2, boxSize * 0.5, 8), boxSize, 10, 0x7799dd);
+         createBox(new CANNON.Vec3(-13.2, boxSize * 1.5, 8), boxSize, 10, 0x88AAdd);
+         createBox(new CANNON.Vec3(-13.2, boxSize * 2.5, 8), boxSize, 10, 0x99BBee);
+         createBox(new CANNON.Vec3(-14.4, boxSize * 0.5, 8), boxSize, 10, 0xaaccff);
+
+         createBox(new CANNON.Vec3(-15, boxSize * 0.5, 3), boxSize * 1.5, 20, 0x88cc88);
+         createBox(new CANNON.Vec3(-17, boxSize * 0.5, 3), boxSize, 10, 0x99dd99);
+         createBox(new CANNON.Vec3(-17, boxSize * 1.5, 3), boxSize, 10, 0xAAddAA);
+         createBox(new CANNON.Vec3(-17, boxSize * 2.5, 3), boxSize, 10, 0xBBeeBB);
+         createBox(new CANNON.Vec3(-19, boxSize * 0.5, 3), boxSize, 10, 0xCCffCC);
+
+         createSphere(new CANNON.Vec3(-14, 0.7, 7), 0.7, 5, 0xffdddd);
+         createSphere(new CANNON.Vec3(-16, 0.6, 6), 0.6, 4, 0xddffdd);
+         createSphere(new CANNON.Vec3(-18, 0.5, 5), 0.5, 3, 0xddddff);
+         createSphere(new CANNON.Vec3(-9, 0.8, 8), 0.8, 7, 0xffffcc);
+         createSphere(new CANNON.Vec3(-11, 1.0, 10), 1.0, 10, 0xffccff);
+         createSphere(new CANNON.Vec3(-19, 0.7, 7), 0.7, 5, 0xccffff);
+         createSphere(new CANNON.Vec3(-15, 1.2, 11), 1.2, 12, 0xcccccc);
+
+         // Ramps
+         createRamp(new CANNON.Vec3(0, 0.25, -15), { x: 5, y: 0.5, z: 10 }, 15, 0x999999);
+         createRamp(new CANNON.Vec3(10, 0.4, -20), { x: 4, y: 0.8, z: 8 }, 25, 0xaaaaaa);
+         createRamp(new CANNON.Vec3(-10, 0.15, -25), { x: 6, y: 0.3, z: 12 }, 10, 0xbbbbbb);
+
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        initializeTuningParams();
+        setupTuningListeners();
+        resetCar();
+        animate();
+
+    </script>
+</body>
+</html>
