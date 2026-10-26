@@ -419,7 +419,51 @@
         carMesh.add(cockpitMesh);
         scene.add(carMesh);
 
-        const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x181818, roughness: 0.7, metalness: 0.1 });
+        // Caps share each tire's mesh/material: no extra draw calls or random UUIDs.
+        function addWheelFaceDetail(geometry, radius, width) {
+            const positions = Array.from(geometry.attributes.position.array);
+            const normals = Array.from(geometry.attributes.normal.array);
+            const uvs = Array.from(geometry.attributes.uv.array);
+            const indices = Array.from(geometry.index.array);
+            const colors = Array(positions.length).fill(0.094);
+            const rubber = [0.094, 0.094, 0.094];
+            const metal = [0.56, 0.61, 0.67];
+            const hub = [0.31, 0.35, 0.40];
+            const sectors = 12;
+            for (const side of [-1, 1]) {
+                const x = side * (width / 2 + 0.003);
+                const vertex = (r, angle, color) => {
+                    const index = positions.length / 3;
+                    positions.push(x, r * Math.cos(angle), r * Math.sin(angle));
+                    normals.push(side, 0, 0); colors.push(...color);
+                    uvs.push(0.5 + r * Math.cos(angle) / (2 * radius), 0.5 + r * Math.sin(angle) / (2 * radius));
+                    return index;
+                };
+                const triangle = (a, b, c) => {
+                    if (side > 0) indices.push(a, b, c);
+                    else indices.push(a, c, b);
+                };
+                for (let i = 0; i < sectors; i++) {
+                    const a = i * Math.PI * 2 / sectors, b = (i + 1) * Math.PI * 2 / sectors;
+                    triangle(vertex(0, a, hub), vertex(radius * 0.16, a, hub), vertex(radius * 0.16, b, hub));
+                    for (const [inner, outer, color] of [[0.16, 0.56, i % 2 === 0 ? metal : rubber], [0.56, 0.68, metal]]) {
+                        const first = vertex(radius * inner, a, color);
+                        const second = vertex(radius * outer, a, color);
+                        const third = vertex(radius * outer, b, color);
+                        const fourth = vertex(radius * inner, b, color);
+                        triangle(first, second, third); triangle(first, third, fourth);
+                    }
+                }
+            }
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            geometry.setIndex(indices);
+            // One material covers tire and caps; the original cylinder groups are obsolete.
+            geometry.clearGroups();
+        }
+        const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.7, metalness: 0.1 });
         const wheels = [];
         const wheelInfos = [];
         const wheelbase = chassisLength * 0.7;
@@ -434,6 +478,7 @@
          wheelBasePositions.forEach((posInfo) => {
             const wheelGeometry = new THREE.CylinderGeometry(initialDefaultParams.wheelRadius, initialDefaultParams.wheelRadius, wheelWidth, 24);
             wheelGeometry.rotateZ(Math.PI / 2);
+            addWheelFaceDetail(wheelGeometry, initialDefaultParams.wheelRadius, wheelWidth);
             const wheelMesh = new THREE.Mesh(wheelGeometry, wheelMaterial);
             wheelMesh.castShadow = true; wheelMesh.receiveShadow = true;
 
@@ -458,6 +503,7 @@
                 worldPos: new CANNON.Vec3(),
                 hitPoint: new CANNON.Vec3(),
                 steeringAngle: 0,
+                rollingPhase: 0,
                 visualWheel: wheelMesh,
                 lastSuspensionLength: initialDefaultParams.suspensionRestDist,
                 isInContact: false,
@@ -626,6 +672,7 @@
 
             wheelInfos.forEach(info => {
                 info.steeringAngle = 0;
+                info.rollingPhase = 0;
                 info.lastSuspensionLength = initialDefaultParams.suspensionRestDist;
                 info.slipVelocity = 0;
 
@@ -976,7 +1023,10 @@
                  const forwardSpeedComponent = cannonToThree(wheelWorldVel).dot(forwardDirWorldTHREE);
                  const wheelCircumference = 2 * Math.PI * currentRadius;
                  const wheelAngularDelta = wheelCircumference > 0.01 ? (forwardSpeedComponent * dt) / currentRadius : 0;
-                 visualWheel.rotateOnAxis(wheelAxis, -wheelAngularDelta);
+                 // +X rotation rolls toward +Z. Resolve travel before applying roll,
+                 // then retain only a bounded phase to avoid long-session precision loss.
+                 info.rollingPhase = (info.rollingPhase + wheelAngularDelta) % (2 * Math.PI);
+                 visualWheel.rotateOnAxis(wheelAxis, info.rollingPhase);
              });
 
              boxes.forEach(boxInfo => {
