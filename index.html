@@ -796,9 +796,15 @@
              carBody.applyForce(_cannonVec3_4, rayHit.hitPointWorld);
          }
 
-        const clock = new THREE.Clock();
         let currentSteer = 0;
         const fixedTimeStep = 1 / 60;
+        const maxCatchUpSteps = 6, longFrameSeconds = 0.25;
+        let lastFrameTime = null, accumulatedTime = 0;
+
+        function resetFrameClock() {
+            lastFrameTime = null;
+            accumulatedTime = 0;
+        }
         const cameraLookAtTarget = new THREE.Vector3();
         let isStuckOnSideOrRoof = false;
         let stuckTimer = 0;
@@ -823,9 +829,8 @@
         }
 
 
-        function animate() {
-            requestAnimationFrame(animate);
-            const dt = clock.getDelta();
+        // Keep the established integration/force order and camera response at 60 Hz.
+        function stepSimulation(dt = fixedTimeStep) {
 
             let targetSteer = 0;
              if (controls.left) targetSteer = tuningParams.maxSteerAngle;
@@ -1003,8 +1008,39 @@
 
             clouds.forEach(cloud => { cloud.rotation.y += (0.0001 + Math.random() * 0.00005) * 60 * dt; });
 
+        }
+
+        function renderFrame() {
+            // Present the latest resolved pose without an interpolation frame of latency.
             renderer.render(scene, camera);
         }
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+            if (document.hidden) {
+                resetFrameClock();
+                return;
+            }
+            if (lastFrameTime !== null) {
+                const elapsed = Math.max(0, (now - lastFrameTime) / 1000);
+                if (elapsed > longFrameSeconds) {
+                    // Drop stall debt instead of fast-forwarding the car on return.
+                    accumulatedTime = 0;
+                } else {
+                    accumulatedTime += Math.min(elapsed, fixedTimeStep * maxCatchUpSteps);
+                    let steps = 0;
+                    while (accumulatedTime + 1e-10 >= fixedTimeStep && steps < maxCatchUpSteps) {
+                        stepSimulation();
+                        accumulatedTime = Math.max(0, accumulatedTime - fixedTimeStep);
+                        steps++;
+                    }
+                }
+            }
+            lastFrameTime = now;
+            renderFrame();
+        }
+
+        document.addEventListener('visibilitychange', resetFrameClock);
 
         // Scenery Functions
         const createCloud = (x, y, z) => {
@@ -1211,7 +1247,9 @@
         initializeTuningParams();
         setupTuningListeners();
         resetCar();
-        animate();
+        // THREE.Clock previously returned zero on its first call, but physics still stepped.
+        stepSimulation(0);
+        animate(performance.now());
 
     </script>
 <!-- tront-about:start -->
