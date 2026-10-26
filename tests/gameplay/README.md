@@ -29,3 +29,16 @@ The runtime preserves the original integration-before-force order, reset
 behavior, cold zero-delta update and 60 Hz camera response. It draws the latest
 resolved pose without interpolation latency. A callback catches up at most six
 ticks; gaps over 250 ms and visibility transitions discard elapsed debt.
+
+The wheel regression adds 14 checks per cadence (70 total): signed travel/radius
+integration, steering-axis composition, forward/reverse travel, continuous phase
+wrapping, stopped phase, radius changes, reset, zero-delta updates and geometry
+attribute counts. It uses real simulation ticks and direct scene fixtures. The
+stopped fixture holds a sleeping, level body clear of contacts before each tick;
+ordinary braking and handbrake remain separate moving-car scenarios.
+
+The rolling change is separately compared with the shipped cadence baseline
+`4f9a97bf3956b6fbb91074f7e524200101410147`, excluding only the intentionally changed
+wheel visual quaternion. Camera, suspension placement, collision, all bodies,
+forces, tuning, timers and RNG must remain equal. Close side/front-quarter clips
+and long-session phase checks supplement the automated browser gate.
