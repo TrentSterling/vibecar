@@ -28,10 +28,19 @@ jobs:
         env:
           REPO_NAME: ${{ github.event.repository.name }}
         run: node tests/about-discovery/browser.cjs
+      - name: Driving cadence and recovery regressions
+        run: node tests/gameplay/browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: about-discovery-evidence
           path: .about-evidence/
+          include-hidden-files: true
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vibecar-gameplay-evidence
+          path: .gameplay-evidence/
           include-hidden-files: true
           retention-days: 7
